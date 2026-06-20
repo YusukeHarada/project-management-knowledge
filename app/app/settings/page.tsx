@@ -95,6 +95,15 @@ function SettingsContent() {
             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-5">
                 <h2 className="text-base font-semibold">プロフィール</h2>
 
+                {firebaseUser?.email && (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
+                        <p className="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5">
+                            {firebaseUser.email}
+                        </p>
+                    </div>
+                )}
+
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">表示名</label>
                     <input
