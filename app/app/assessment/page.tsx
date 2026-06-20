@@ -27,6 +27,7 @@ function AssessmentContent() {
     const router = useRouter()
     const params = useSearchParams()
     const userId = params.get("userId")
+    const editDate = params.get("editDate")   // 指定時: 過去セッションの編集モード
 
     const [user, setUser] = useState<User | null>(null)
     const [categories, setCategories] = useState<Category[]>([])
@@ -39,10 +40,13 @@ function AssessmentContent() {
 
     useEffect(() => {
         if (!userId) { router.push("/"); return }
+        const assessmentsUrl = editDate
+            ? `/api/assessments?userId=${userId}&date=${encodeURIComponent(editDate)}`
+            : `/api/assessments?userId=${userId}`
         Promise.all([
             fetch(`/api/users`).then((r) => r.json()),
             fetch("/api/master").then((r) => r.json()),
-            fetch(`/api/assessments?userId=${userId}`).then((r) => r.json()),
+            fetch(assessmentsUrl).then((r) => r.json()),
         ]).then(([users, master, existingAssessments]: [User[], { categories: Category[]; skillItems: SkillItem[]; roleTargets: RoleTarget[] }, Assessment[]]) => {
             const found = users.find((u) => u.id === userId)
             if (!found) { router.push("/"); return }
@@ -52,7 +56,6 @@ function AssessmentContent() {
             setRoleTargets(master.roleTargets)
             if (master.categories.length > 0) setActiveCategory(master.categories[0].id)
 
-            // 既存の評価で初期化（前回値を pre-fill）
             const initial: Record<string, AssessmentState> = {}
             for (const item of master.skillItems) {
                 const prev = existingAssessments.find((a) => a.skillItemId === item.id)
@@ -61,7 +64,7 @@ function AssessmentContent() {
             setAnswers(initial)
             setLoading(false)
         })
-    }, [userId, router])
+    }, [userId, editDate, router])
 
     function getTargetLevel(skillItemId: string): number {
         if (!user) return 0
@@ -84,11 +87,21 @@ function AssessmentContent() {
             currentLevel: state.currentLevel,
             evidence: state.evidence,
         }))
-        await fetch("/api/assessments", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId, items }),
-        })
+        if (editDate) {
+            // 編集モード: 既存セッションを上書き（PUT）
+            await fetch("/api/assessments", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId, date: editDate, items }),
+            })
+        } else {
+            // 新規モード: 新しいセッションを作成（POST）
+            await fetch("/api/assessments", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId, items }),
+            })
+        }
         router.push(`/dashboard/${userId}`)
     }
 
@@ -146,7 +159,7 @@ function AssessmentContent() {
                         disabled={submitting}
                         className="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
                     >
-                        {submitting ? "保存中..." : "結果を保存する"}
+                        {submitting ? "保存中..." : editDate ? "この診断を更新する" : "結果を保存する"}
                     </button>
                 </div>
 
@@ -210,7 +223,7 @@ function AssessmentContent() {
                         disabled={submitting}
                         className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
                     >
-                        {submitting ? "保存中..." : "結果を保存してダッシュボードへ"}
+                        {submitting ? "保存中..." : editDate ? "この診断を更新してダッシュボードへ" : "結果を保存してダッシュボードへ"}
                     </button>
                 </div>
             </div>
