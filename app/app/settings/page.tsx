@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
+import { isAdmin } from "@/lib/utils/admin"
 import type { Role, User } from "@/types"
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -98,9 +99,21 @@ function SettingsContent() {
                 {firebaseUser?.email && (
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
-                        <p className="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5">
-                            {firebaseUser.email}
-                        </p>
+                        <div className="flex items-center gap-2">
+                            <p className="flex-1 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5">
+                                {firebaseUser.email}
+                            </p>
+                            {isAdmin(firebaseUser.email) && (
+                                <span className="text-xs bg-blue-100 text-blue-700 border border-blue-200 rounded-full px-2.5 py-1 shrink-0">
+                                    管理者
+                                </span>
+                            )}
+                        </div>
+                        {isAdmin(firebaseUser.email) && (
+                            <a href="/admin" className="mt-2 inline-block text-xs text-blue-600 hover:underline">
+                                → マスタ管理ページへ
+                            </a>
+                        )}
                     </div>
                 )}
 
