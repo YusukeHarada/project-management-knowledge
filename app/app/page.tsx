@@ -32,12 +32,16 @@ export default function TopPage() {
         if (tab === "continue") {
             setUsersLoading(true)
             fetch("/api/users")
-                .then((r) => r.json())
-                .then((data: User[]) => {
-                    setUsers(data)
-                    if (data.length > 0) setSelectedUserId(data[0].id)
-                    setUsersLoading(false)
+                .then((r) => {
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+                    return r.json()
                 })
+                .then((data: User[]) => {
+                    setUsers(Array.isArray(data) ? data : [])
+                    if (data.length > 0) setSelectedUserId(data[0].id)
+                })
+                .catch((err) => console.error("ユーザー一覧の取得に失敗:", err))
+                .finally(() => setUsersLoading(false))
         }
     }, [tab])
 
