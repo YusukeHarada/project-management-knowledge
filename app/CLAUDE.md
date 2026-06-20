@@ -173,6 +173,58 @@ Firebase Client SDK はブラウザ API に依存するため、`app/layout.tsx`
 
 ---
 
+## Vercel デプロイ時のハマりパターン
+
+### 404: NOT_FOUND — Next.js アプリがサブディレクトリにある
+
+**症状**: デプロイしても `404: NOT_FOUND` になる。
+
+**原因**: Vercel がリポジトリルートを Next.js プロジェクトとして探すが、本プロジェクトは `app/` サブディレクトリにある。
+
+**解決策**: Vercel ダッシュボード → Settings → Root Directory = `app` に設定 + `app/vercel.json` を追加。
+
+---
+
+### FirestoreSkillRepository is not a constructor
+
+**症状**: `lib/db/index.ts` で `require("./firestore")` したクラスが `is not a constructor` になる。
+
+**原因**: ES モジュール（`export class`）を `require()` で読み込もうとすると named export が取得できないことがある（Turbopack / Vercel 環境）。
+
+**解決策**: `getRepository()` を `async` 関数にして `require()` を `await import()` に変更。呼び出し元（API ルート）も `await getRepository()` に変更。
+
+---
+
+### Vercel で Firebase Admin 初期化が失敗する（秘密鍵の `\n` 問題）
+
+**症状**: ローカルでは動くが Vercel では API が 500 になる。
+
+**原因**: Vercel の環境変数エディタを通すと `private_key` の改行（`\n`）が `\\n` のままになることがある。
+
+**解決策**: `lib/firebase/admin.ts` で `JSON.parse` 後に `.replace(/\\n/g, "\n")` を適用（実装済み）。
+
+---
+
+### ERR_REQUIRE_ESM — firebase-admin/auth と jose の ESM/CJS 競合
+
+**症状**: Vercel で `require() of ES Module jose/dist/webapi/index.js not supported` エラーで API が 500。
+
+**原因**: `firebase-admin/auth` → `jwks-rsa` → `jose`（ESM only）の依存チェーンが Vercel の Node.js 環境で壊れる。
+
+**解決策**: サーバー側 Auth トークン検証が不要な場合は `firebase-admin/auth` を import しない（`lib/firebase/admin.ts` では `getAuth` を import していない）。
+
+---
+
+### API 500 時に画面がクラッシュして無限リロードする
+
+**症状**: API が 500 を返すとコンポーネントが `f.map is not a function` でクラッシュし、React が再マウントして無限ループになる。
+
+**原因**: `fetch` のレスポンスをエラーチェックなしで配列として使っており、`{error: "..."}` オブジェクトに対して `.map()` が失敗する。
+
+**解決策**: 全 fetch に try/catch と `Array.isArray()` チェックを追加し、エラー時は state に保存して画面に表示する。
+
+---
+
 ## スコープ管理
 
 ### 実装済み
