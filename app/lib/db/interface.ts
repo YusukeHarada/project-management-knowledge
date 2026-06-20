@@ -30,5 +30,7 @@ export interface ISkillRepository {
   saveAssessment(userId: string, items: AssessmentInput[]): Promise<void>
   getAssessmentByUser(userId: string): Promise<Assessment[]>
   getLatestAssessmentByUser(userId: string): Promise<Assessment[]>
+  getAssessmentSessions(userId: string): Promise<string[]>
+  getAssessmentByUserAndDate(userId: string, evaluatedAt: string): Promise<Assessment[]>
   getAllLatestAssessments(): Promise<(Assessment & { userName: string; userRole: Role })[]>
 }
