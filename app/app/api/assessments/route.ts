@@ -88,3 +88,20 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: String(err) }, { status: 500 })
     }
 }
+
+export async function DELETE(req: NextRequest) {
+    try {
+        const { searchParams } = new URL(req.url)
+        const userId = searchParams.get("userId")
+        const date = searchParams.get("date")
+        if (!userId || !date) {
+            return NextResponse.json({ error: "userId と date が必要です" }, { status: 400 })
+        }
+        const repo = await getRepository()
+        await repo.deleteAssessmentSession(userId, date)
+        return NextResponse.json({ ok: true })
+    } catch (err) {
+        console.error("DELETE /api/assessments error:", err)
+        return NextResponse.json({ error: String(err) }, { status: 500 })
+    }
+}

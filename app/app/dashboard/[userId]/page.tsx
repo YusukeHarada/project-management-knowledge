@@ -32,6 +32,7 @@ export default function PersonalDashboard() {
     const [historyCount, setHistoryCount] = useState(3)
     const [trendData, setTrendData] = useState<TrendPoint[]>([])
     const [loading, setLoading] = useState(true)
+    const [refreshKey, setRefreshKey] = useState(0)
 
     useEffect(() => {
         Promise.all([
@@ -49,10 +50,10 @@ export default function PersonalDashboard() {
             const gaps = buildGapAnalysis(assessments, master.skillItems, master.categories, master.roleTargets, found.role)
             setGapAnalyses(gaps)
             setCategoryScores(aggregateCategoryScores(gaps, master.categories))
-            setSessions(sessionDates)
+            setSessions(Array.isArray(sessionDates) ? sessionDates : [])
             setLoading(false)
         })
-    }, [userId])
+    }, [userId, refreshKey])
 
     // 履歴列表示・推移グラフ共用: 全履歴を一度だけ取得
     useEffect(() => {
@@ -61,7 +62,7 @@ export default function PersonalDashboard() {
             .then((data: Assessment[]) => {
                 if (Array.isArray(data)) setAllAssessmentsForHistory(data)
             })
-    }, [userId])
+    }, [userId, refreshKey])
 
     // 推移グラフ: 全履歴からカテゴリ平均を計算
     useEffect(() => {
@@ -108,6 +109,12 @@ export default function PersonalDashboard() {
 
     // 推移グラフ用のカテゴリキー一覧
     const trendCategories = categories.map((c) => c.name.replace(/（.*）/, "").substring(0, 8))
+
+    async function handleDeleteSession(sessionDate: string) {
+        if (!confirm(`${new Date(sessionDate).toLocaleString("ja-JP")} の診断を削除しますか？\nこの操作は元に戻せません。`)) return
+        await fetch(`/api/assessments?userId=${userId}&date=${encodeURIComponent(sessionDate)}`, { method: "DELETE" })
+        setRefreshKey((k) => k + 1)
+    }
 
     function shortDate(iso: string) {
         return new Date(iso).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" })
@@ -223,18 +230,24 @@ export default function PersonalDashboard() {
                                 <th className="text-left py-2 pr-3">評価項目</th>
                                 {displaySessions.map((s, i) => (
                                     <th key={s} className="text-center py-2 px-2 whitespace-nowrap">
-                                        <div>{shortDate(s)}</div>
-                                        {i === displaySessions.length - 1
-                                            ? <div className="text-blue-600 font-medium">今回</div>
-                                            : (
-                                                <a
-                                                    href={`/assessment?userId=${userId}&editDate=${encodeURIComponent(s)}`}
-                                                    className="text-orange-500 hover:underline font-normal"
-                                                >
-                                                    編集
-                                                </a>
-                                            )
-                                        }
+                                        <div className={i === displaySessions.length - 1 ? "text-blue-600 font-semibold" : "text-gray-600"}>
+                                            {shortDate(s)}{i === displaySessions.length - 1 && " (今回)"}
+                                        </div>
+                                        <div className="flex gap-1 justify-center mt-0.5">
+                                            <a
+                                                href={`/assessment?userId=${userId}&editDate=${encodeURIComponent(s)}`}
+                                                className="text-orange-500 hover:underline text-xs font-normal"
+                                            >
+                                                編集
+                                            </a>
+                                            <span className="text-gray-300 text-xs">|</span>
+                                            <button
+                                                onClick={() => handleDeleteSession(s)}
+                                                className="text-red-400 hover:text-red-600 text-xs font-normal"
+                                            >
+                                                削除
+                                            </button>
+                                        </div>
                                     </th>
                                 ))}
                                 <th className="text-center py-2 px-2 w-14">目標</th>

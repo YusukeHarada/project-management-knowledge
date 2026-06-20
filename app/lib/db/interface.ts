@@ -25,6 +25,7 @@ export interface ISkillRepository {
   createUser(name: string, role: Role, id?: string): Promise<User>
   getUserById(id: string): Promise<User | null>
   getAllUsers(): Promise<User[]>
+  deleteUser(userId: string): Promise<void>
 
   // 評価
   saveAssessment(userId: string, items: AssessmentInput[]): Promise<void>
@@ -33,5 +34,6 @@ export interface ISkillRepository {
   getAssessmentSessions(userId: string): Promise<string[]>
   getAssessmentByUserAndDate(userId: string, evaluatedAt: string): Promise<Assessment[]>
   updateAssessmentSession(userId: string, evaluatedAt: string, items: AssessmentInput[]): Promise<void>
+  deleteAssessmentSession(userId: string, evaluatedAt: string): Promise<void>
   getAllLatestAssessments(): Promise<(Assessment & { userName: string; userRole: Role })[]>
 }
