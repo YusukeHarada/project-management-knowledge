@@ -14,38 +14,45 @@ const saveAssessmentSchema = z.object({
 })
 
 export async function POST(req: NextRequest) {
-    const body = await req.json()
-    const parsed = saveAssessmentSchema.safeParse(body)
-    if (!parsed.success) {
-        return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+    try {
+        const body = await req.json()
+        const parsed = saveAssessmentSchema.safeParse(body)
+        if (!parsed.success) {
+            return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+        }
+        const repo = await getRepository()
+        await repo.saveAssessment(parsed.data.userId, parsed.data.items as Parameters<typeof repo.saveAssessment>[1])
+        return NextResponse.json({ ok: true }, { status: 201 })
+    } catch (err) {
+        console.error("POST /api/assessments error:", err)
+        return NextResponse.json({ error: String(err) }, { status: 500 })
     }
-    const repo = await getRepository()
-    await repo.saveAssessment(parsed.data.userId, parsed.data.items as Parameters<typeof repo.saveAssessment>[1])
-    return NextResponse.json({ ok: true }, { status: 201 })
 }
 
 export async function GET(req: NextRequest) {
-    const { searchParams } = new URL(req.url)
-    const userId = searchParams.get("userId")
-    const date = searchParams.get("date")
-    const sessions = searchParams.get("sessions")
-    const repo = await getRepository()
+    try {
+        const { searchParams } = new URL(req.url)
+        const userId = searchParams.get("userId")
+        const date = searchParams.get("date")
+        const sessions = searchParams.get("sessions")
+        const repo = await getRepository()
 
-    if (userId && sessions === "true") {
-        const dates = await repo.getAssessmentSessions(userId)
-        return NextResponse.json(dates)
-    }
-
-    if (userId && date) {
-        const assessments = await repo.getAssessmentByUserAndDate(userId, date)
+        if (userId && sessions === "true") {
+            const dates = await repo.getAssessmentSessions(userId)
+            return NextResponse.json(dates)
+        }
+        if (userId && date) {
+            const assessments = await repo.getAssessmentByUserAndDate(userId, date)
+            return NextResponse.json(assessments)
+        }
+        if (userId) {
+            const assessments = await repo.getLatestAssessmentByUser(userId)
+            return NextResponse.json(assessments)
+        }
+        const assessments = await repo.getAllLatestAssessments()
         return NextResponse.json(assessments)
+    } catch (err) {
+        console.error("GET /api/assessments error:", err)
+        return NextResponse.json({ error: String(err) }, { status: 500 })
     }
-
-    if (userId) {
-        const assessments = await repo.getLatestAssessmentByUser(userId)
-        return NextResponse.json(assessments)
-    }
-
-    const assessments = await repo.getAllLatestAssessments()
-    return NextResponse.json(assessments)
 }
