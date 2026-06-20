@@ -1,12 +1,17 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import type { Category, SkillItem, RoleTarget, Role, Level, User } from "@/types"
+import { useAuth } from "@/contexts/AuthContext"
+import { isAdmin } from "@/lib/utils/admin"
 
 const ROLES: Role[] = ["developer", "pl", "pm", "promoter"]
 const ROLE_LABELS: Record<Role, string> = { developer: "開発者", pl: "PL", pm: "PM", promoter: "推進者" }
 
 export default function AdminPage() {
+  const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const [categories, setCategories] = useState<Category[]>([])
   const [skillItems, setSkillItems] = useState<SkillItem[]>([])
   const [roleTargets, setRoleTargets] = useState<RoleTarget[]>([])
@@ -106,6 +111,12 @@ export default function AdminPage() {
       const data = await res.json()
       alert(`エラー: ${data.error}`)
     }
+  }
+
+  // 管理者チェック（Firestore モードのみ。認証解決後に判定）
+  if (!authLoading && !isAdmin(user?.email)) {
+    router.replace("/")
+    return null
   }
 
   if (loading) return <div className="text-center py-20 text-gray-500">読み込み中...</div>

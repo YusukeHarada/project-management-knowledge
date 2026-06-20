@@ -135,12 +135,20 @@ export default function PersonalDashboard() {
                     <h1 className="text-2xl font-bold">{user.name} さんのスキル診断結果</h1>
                     <p className="text-gray-500 text-sm mt-1">ロール：{ROLE_LABELS[user.role]}</p>
                 </div>
-                <a
-                    href={`/assessment?userId=${userId}`}
-                    className="text-sm text-blue-600 border border-blue-300 rounded-lg px-4 py-2 hover:bg-blue-50 transition-colors"
-                >
-                    再診断する
-                </a>
+                <div className="flex gap-2">
+                    <a
+                        href={`/settings${process.env.NEXT_PUBLIC_DB_BACKEND !== "firestore" ? `?userId=${userId}` : ""}`}
+                        className="text-sm text-gray-600 border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50 transition-colors"
+                    >
+                        設定
+                    </a>
+                    <a
+                        href={`/assessment?userId=${userId}`}
+                        className="text-sm text-blue-600 border border-blue-300 rounded-lg px-4 py-2 hover:bg-blue-50 transition-colors"
+                    >
+                        再診断する
+                    </a>
+                </div>
             </div>
 
             {/* レーダーチャート */}

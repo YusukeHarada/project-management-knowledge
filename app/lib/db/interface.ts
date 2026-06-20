@@ -25,6 +25,7 @@ export interface ISkillRepository {
   createUser(name: string, role: Role, id?: string): Promise<User>
   getUserById(id: string): Promise<User | null>
   getAllUsers(): Promise<User[]>
+  updateUser(userId: string, data: { name?: string; role?: Role }): Promise<User>
   deleteUser(userId: string): Promise<void>
 
   // 評価

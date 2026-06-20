@@ -21,6 +21,7 @@ function FirestoreTopPage() {
     const [existingUser, setExistingUser] = useState<User | null>(null)
     const [showRoleSelect, setShowRoleSelect] = useState(false)
     const [role, setRole] = useState<Role>("developer")
+    const [displayNameInput, setDisplayNameInput] = useState("")
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
 
@@ -39,6 +40,12 @@ function FirestoreTopPage() {
             .catch(() => { setShowRoleSelect(true); setLoading(false) })
     }, [firebaseUser])
 
+    useEffect(() => {
+        if (firebaseUser && !displayNameInput) {
+            setDisplayNameInput(firebaseUser.displayName || "")
+        }
+    }, [firebaseUser, displayNameInput])
+
     async function handleStart() {
         if (existingUser) {
             router.push(`/assessment?userId=${existingUser.id}`)
@@ -46,7 +53,7 @@ function FirestoreTopPage() {
         }
         if (!firebaseUser) return
         setSaving(true)
-        const name = firebaseUser.displayName || firebaseUser.email || "ユーザー"
+        const name = displayNameInput.trim() || firebaseUser.displayName || firebaseUser.email || "ユーザー"
         const res = await fetch("/api/users", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -89,8 +96,15 @@ function FirestoreTopPage() {
                 ) : showRoleSelect ? (
                     <div className="space-y-5">
                         <div>
-                            <p className="text-sm text-gray-600 mb-1">Google アカウント</p>
-                            <p className="font-medium text-gray-900">{displayName}</p>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">表示名</label>
+                            <input
+                                type="text"
+                                value={displayNameInput}
+                                onChange={(e) => setDisplayNameInput(e.target.value)}
+                                placeholder={firebaseUser?.displayName || firebaseUser?.email || "お名前を入力"}
+                                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <p className="text-xs text-gray-400 mt-1">アプリ内での表示名です。後から設定で変更できます。</p>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">ロールを選択してください</label>

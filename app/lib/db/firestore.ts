@@ -10,6 +10,9 @@ function db() {
     return adminDb()
 }
 
+// サーバープロセス内でシード済みかをキャッシュ（リクエストごとに Firestore を読みに行かない）
+let _seeded = false
+
 function fromSnap<T>(snap: QueryDocumentSnapshot<DocumentData>): T {
     const d = snap.data()
     for (const key of Object.keys(d)) {
@@ -32,10 +35,13 @@ export class FirestoreSkillRepository implements ISkillRepository {
     }
 
     async getSkillItems(): Promise<SkillItem[]> {
-        const cats = await this.getCategories()
-        const catOrder = Object.fromEntries(cats.map((c) => [c.id, c.order]))
-        const snap = await this.col("skill_items").get()
-        return snap.docs
+        // getCategories() を経由すると seedIfEmpty が再度走るため、並列で直接読む
+        const [catSnap, itemSnap] = await Promise.all([
+            this.col("categories").get(),
+            this.col("skill_items").get(),
+        ])
+        const catOrder = Object.fromEntries(catSnap.docs.map((d) => [d.id, (d.data().order as number) ?? 0]))
+        return itemSnap.docs
             .map((d) => fromSnap<SkillItem>(d))
             .sort((a, b) => {
                 const co = (catOrder[a.categoryId] ?? 0) - (catOrder[b.categoryId] ?? 0)
@@ -97,6 +103,15 @@ export class FirestoreSkillRepository implements ISkillRepository {
     async getAllUsers(): Promise<User[]> {
         const snap = await this.col("users").get()
         return snap.docs.map((d) => fromSnap<User>(d))
+    }
+
+    async updateUser(userId: string, data: { name?: string; role?: Role }): Promise<User> {
+        const updates: Record<string, unknown> = {}
+        if (data.name !== undefined) updates.name = data.name
+        if (data.role !== undefined) updates.role = data.role
+        await this.col("users").doc(userId).update(updates)
+        const snap = await this.col("users").doc(userId).get()
+        return fromSnap<User>(snap as QueryDocumentSnapshot<DocumentData>)
     }
 
     async deleteUser(userId: string): Promise<void> {
@@ -208,8 +223,9 @@ export class FirestoreSkillRepository implements ISkillRepository {
     }
 
     private async seedIfEmpty(): Promise<void> {
+        if (_seeded) return  // キャッシュ済みならスキップ
         const snap = await this.col("categories").limit(1).get()
-        if (!snap.empty) return
+        if (!snap.empty) { _seeded = true; return }
 
         const batch = db().batch()
         for (const c of SEED_CATEGORIES) {
@@ -223,5 +239,6 @@ export class FirestoreSkillRepository implements ISkillRepository {
             batch.set(this.col("role_targets").doc(id), t)
         }
         await batch.commit()
+        _seeded = true
     }
 }
