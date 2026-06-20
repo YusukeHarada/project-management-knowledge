@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 import {
-    RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Legend, Tooltip,
+    RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Legend, Tooltip,
     LineChart, Line, XAxis, YAxis, CartesianGrid,
 } from "recharts"
 import { buildGapAnalysis, aggregateCategoryScores } from "@/lib/domain/scoring"
@@ -158,6 +158,7 @@ export default function PersonalDashboard() {
                     <RadarChart data={radarData}>
                         <PolarGrid />
                         <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11 }} />
+                        <PolarRadiusAxis domain={[0, 3]} tick={false} />
                         <Radar name="現状" dataKey="現状" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} />
                         <Radar name="目標" dataKey="目標" stroke="#10b981" fill="#10b981" fillOpacity={0.1} strokeDasharray="4 2" />
                         <Legend />
