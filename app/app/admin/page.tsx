@@ -23,6 +23,7 @@ export default function AdminPage() {
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<"categories" | "items" | "users">("categories")
   const [users, setUsers] = useState<User[]>([])
+  const [editingUser, setEditingUser] = useState<{ id: string; name: string; role: Role } | null>(null)
 
   async function load() {
     const [master, userList] = await Promise.all([
@@ -42,6 +43,19 @@ export default function AdminPage() {
     if (!confirm(`「${name}」を削除しますか？\n診断データもすべて削除されます。この操作は元に戻せません。`)) return
     await fetch(`/api/users?id=${id}`, { method: "DELETE" })
     await load()
+  }
+
+  async function saveUser() {
+    if (!editingUser || !editingUser.name.trim()) return
+    setSaving(true)
+    await fetch("/api/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: editingUser.id, name: editingUser.name.trim(), role: editingUser.role }),
+    })
+    setEditingUser(null)
+    await load()
+    setSaving(false)
   }
 
   function getTarget(skillItemId: string, role: Role): Level {
@@ -105,12 +119,26 @@ export default function AdminPage() {
 
   async function exportSkillMap() {
     const res = await fetch("/api/admin/export-skillmap", { method: "POST" })
-    if (res.ok) {
-      alert("スキルマップ.md を更新しました。")
-    } else {
+    if (!res.ok) {
       const data = await res.json()
       alert(`エラー: ${data.error}`)
+      return
     }
+    const text = await res.text()
+    const blob = new Blob([text], { type: "text/markdown" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "スキルマップ.md"
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function levelBadgeClass(lv: Level): string {
+    if (lv === 0) return "bg-gray-100 text-gray-400"
+    if (lv === 1) return "bg-yellow-100 text-yellow-700"
+    if (lv === 2) return "bg-blue-100 text-blue-700"
+    return "bg-green-100 text-green-700"
   }
 
   async function rebuildSummaries() {
@@ -149,7 +177,7 @@ export default function AdminPage() {
             onClick={exportSkillMap}
             className="text-sm text-gray-600 border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50 transition-colors"
           >
-            スキルマップ.md を更新する
+            スキルマップ.md をダウンロードする
           </button>
         </div>
       </div>
@@ -293,11 +321,14 @@ export default function AdminPage() {
                       <span className="text-xs font-mono text-gray-400 w-8 mt-0.5 shrink-0">{item.number}</span>
                       <span className="flex-1 text-sm text-gray-800 leading-snug">{item.label}</span>
                       <div className="flex gap-2 shrink-0">
-                        {ROLES.map((r) => (
-                          <span key={r} className="text-xs text-gray-500 bg-gray-100 rounded px-1.5 py-0.5">
-                            {ROLE_LABELS[r].substring(0, 2)}:Lv{getTarget(item.id, r)}
-                          </span>
-                        ))}
+                        {ROLES.map((r) => {
+                          const lv = getTarget(item.id, r)
+                          return (
+                            <span key={r} className={`text-xs rounded px-1.5 py-0.5 ${levelBadgeClass(lv)}`}>
+                              {ROLE_LABELS[r].substring(0, 2)}:Lv{lv}
+                            </span>
+                          )
+                        })}
                       </div>
                       <div className="flex gap-2 shrink-0">
                         <button onClick={() => startEditItem(item)} className="text-xs text-blue-600 hover:text-blue-800">編集</button>
@@ -332,20 +363,43 @@ export default function AdminPage() {
               </thead>
               <tbody>
                 {users.map((u) => (
-                  <tr key={u.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-2 pr-4 font-medium">{u.name}</td>
-                    <td className="py-2 pr-4 text-gray-600">{ROLE_LABELS[u.role]}</td>
-                    <td className="py-2 pr-4 text-gray-500 text-xs">{new Date(u.createdAt).toLocaleDateString("ja-JP")}</td>
-                    <td className="py-2 text-right">
-                      <a href={`/dashboard/${u.id}`} className="text-xs text-blue-600 hover:underline mr-3">ダッシュボード</a>
-                      <button
-                        onClick={() => deleteUser(u.id, u.name)}
-                        className="text-xs text-red-500 hover:text-red-700"
-                      >
-                        削除
-                      </button>
-                    </td>
-                  </tr>
+                  editingUser?.id === u.id ? (
+                    <tr key={u.id} className="border-b border-blue-100 bg-blue-50">
+                      <td className="py-2 pr-2">
+                        <input
+                          type="text"
+                          value={editingUser.name}
+                          onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </td>
+                      <td className="py-2 pr-2">
+                        <select
+                          value={editingUser.role}
+                          onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as Role })}
+                          className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        >
+                          {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                        </select>
+                      </td>
+                      <td className="py-2 pr-4 text-gray-500 text-xs">{new Date(u.createdAt).toLocaleDateString("ja-JP")}</td>
+                      <td className="py-2 text-right space-x-2">
+                        <button onClick={saveUser} disabled={saving} className="text-xs text-blue-600 hover:text-blue-800 disabled:opacity-50">保存</button>
+                        <button onClick={() => setEditingUser(null)} className="text-xs text-gray-500 hover:text-gray-700">キャンセル</button>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr key={u.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-2 pr-4 font-medium">{u.name}</td>
+                      <td className="py-2 pr-4 text-gray-600">{ROLE_LABELS[u.role]}</td>
+                      <td className="py-2 pr-4 text-gray-500 text-xs">{new Date(u.createdAt).toLocaleDateString("ja-JP")}</td>
+                      <td className="py-2 text-right space-x-3">
+                        <a href={`/dashboard/${u.id}`} className="text-xs text-blue-600 hover:underline">ダッシュボード</a>
+                        <button onClick={() => setEditingUser({ id: u.id, name: u.name, role: u.role })} className="text-xs text-gray-600 hover:text-gray-900">編集</button>
+                        <button onClick={() => deleteUser(u.id, u.name)} className="text-xs text-red-500 hover:text-red-700">削除</button>
+                      </td>
+                    </tr>
+                  )
                 ))}
               </tbody>
             </table>

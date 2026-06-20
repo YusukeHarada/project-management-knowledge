@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server"
 import { getRepository } from "@/lib/db"
-import path from "path"
-import fs from "fs"
 import type { Category, SkillItem, RoleTarget, Role } from "@/types"
 
 const ROLE_LABELS: Record<Role, string> = { developer: "開発者", pl: "PL", pm: "PM", promoter: "推進者" }
@@ -66,10 +64,13 @@ export async function POST() {
         ])
 
         const markdown = buildMarkdown(categories, skillItems, roleTargets)
-        const outputPath = path.join(process.cwd(), "..", "スキルマップ.md")
-        fs.writeFileSync(outputPath, markdown, "utf-8")
 
-        return NextResponse.json({ ok: true, path: outputPath })
+        return new NextResponse(markdown, {
+            headers: {
+                "Content-Type": "text/plain; charset=utf-8",
+                "Content-Disposition": "attachment; filename*=UTF-8''%E3%82%B9%E3%82%AD%E3%83%AB%E3%83%9E%E3%83%83%E3%83%97.md",
+            },
+        })
     } catch (err) {
         return NextResponse.json({ error: String(err) }, { status: 500 })
     }
