@@ -4,7 +4,7 @@ import { z } from "zod"
 
 const createUserSchema = z.object({
   name: z.string().min(1).max(50),
-  role: z.enum(["developer", "pl", "promoter"]),
+  role: z.enum(["developer", "pl", "pm", "promoter"]),
 })
 
 export async function POST(req: NextRequest) {

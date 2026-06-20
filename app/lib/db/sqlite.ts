@@ -17,8 +17,22 @@ function getDb(): Database.Database {
     _db.pragma("journal_mode = WAL")
     initSchema(_db)
     seedIfEmpty(_db)
+    runMigrations(_db)
   }
   return _db
+}
+
+function runMigrations(db: Database.Database) {
+  // PM ロールの role_targets が存在しない場合、PL の値を使って挿入する
+  const pmCount = (db.prepare("SELECT COUNT(*) as c FROM role_targets WHERE role = 'pm'").get() as { c: number }).c
+  if (pmCount === 0) {
+    const plTargets = db.prepare("SELECT skill_item_id, target_level FROM role_targets WHERE role = 'pl'").all() as { skill_item_id: string; target_level: number }[]
+    const insert = db.prepare("INSERT OR IGNORE INTO role_targets (skill_item_id, role, target_level) VALUES (?, 'pm', ?)")
+    const migrate = db.transaction(() => {
+      for (const t of plTargets) insert.run(t.skill_item_id, t.target_level)
+    })
+    migrate()
+  }
 }
 
 function initSchema(db: Database.Database) {
@@ -82,7 +96,12 @@ export class SqliteSkillRepository implements ISkillRepository {
   }
 
   async getSkillItems(): Promise<SkillItem[]> {
-    const rows = this.db.prepare("SELECT id, category_id, number, label, `order` FROM skill_items ORDER BY `order`").all() as Record<string, unknown>[]
+    const rows = this.db.prepare(`
+      SELECT si.id, si.category_id, si.number, si.label, si.\`order\`
+      FROM skill_items si
+      JOIN categories c ON si.category_id = c.id
+      ORDER BY c.\`order\`, si.\`order\`
+    `).all() as Record<string, unknown>[]
     return rows.map(rowToSkillItem)
   }
 
@@ -173,6 +192,20 @@ export class SqliteSkillRepository implements ISkillRepository {
       ) latest ON a.skill_item_id = latest.skill_item_id AND a.evaluated_at = latest.max_at
       WHERE a.user_id = ?
     `).all(userId, userId) as Record<string, unknown>[]
+    return rows.map(rowToAssessment)
+  }
+
+  async getAssessmentSessions(userId: string): Promise<string[]> {
+    const rows = this.db.prepare(
+      "SELECT DISTINCT evaluated_at FROM assessments WHERE user_id = ? ORDER BY evaluated_at DESC"
+    ).all(userId) as { evaluated_at: string }[]
+    return rows.map((r) => r.evaluated_at)
+  }
+
+  async getAssessmentByUserAndDate(userId: string, evaluatedAt: string): Promise<Assessment[]> {
+    const rows = this.db.prepare(
+      "SELECT id, user_id, skill_item_id, current_level, evidence, evaluated_at FROM assessments WHERE user_id = ? AND evaluated_at = ?"
+    ).all(userId, evaluatedAt) as Record<string, unknown>[]
     return rows.map(rowToAssessment)
   }
 

@@ -1,4 +1,4 @@
-export type Role = "developer" | "pl" | "promoter"
+export type Role = "developer" | "pl" | "pm" | "promoter"
 
 export type Level = 0 | 1 | 2 | 3
 

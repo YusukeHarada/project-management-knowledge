@@ -27,7 +27,19 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const userId = searchParams.get("userId")
+  const date = searchParams.get("date")
+  const sessions = searchParams.get("sessions")
   const repo = getRepository()
+
+  if (userId && sessions === "true") {
+    const dates = await repo.getAssessmentSessions(userId)
+    return NextResponse.json(dates)
+  }
+
+  if (userId && date) {
+    const assessments = await repo.getAssessmentByUserAndDate(userId, date)
+    return NextResponse.json(assessments)
+  }
 
   if (userId) {
     const assessments = await repo.getLatestAssessmentByUser(userId)
