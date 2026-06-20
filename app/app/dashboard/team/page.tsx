@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import {
-    RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Legend, Tooltip,
+    RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Legend, Tooltip,
 } from "recharts"
 import type { User, Category, SkillItem, RoleTarget, Role } from "@/types"
 
@@ -163,6 +163,7 @@ export default function TeamDashboard() {
                         <RadarChart data={radarData}>
                             <PolarGrid />
                             <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11 }} />
+                            <PolarRadiusAxis domain={[0, 3]} tick={false} />
                             <Radar name={radarLabel} dataKey={radarLabel} stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} />
                             <Radar name="目標" dataKey="目標" stroke="#10b981" fill="#10b981" fillOpacity={0.1} strokeDasharray="4 2" />
                             <Legend />
