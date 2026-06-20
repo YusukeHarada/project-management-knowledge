@@ -13,6 +13,32 @@ const saveAssessmentSchema = z.object({
     items: z.array(assessmentItemSchema).min(1),
 })
 
+const updateAssessmentSchema = z.object({
+    userId: z.string(),
+    date: z.string(),
+    items: z.array(assessmentItemSchema).min(1),
+})
+
+export async function PUT(req: NextRequest) {
+    try {
+        const body = await req.json()
+        const parsed = updateAssessmentSchema.safeParse(body)
+        if (!parsed.success) {
+            return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+        }
+        const repo = await getRepository()
+        await repo.updateAssessmentSession(
+            parsed.data.userId,
+            parsed.data.date,
+            parsed.data.items as Parameters<typeof repo.saveAssessment>[1]
+        )
+        return NextResponse.json({ ok: true })
+    } catch (err) {
+        console.error("PUT /api/assessments error:", err)
+        return NextResponse.json({ error: String(err) }, { status: 500 })
+    }
+}
+
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json()

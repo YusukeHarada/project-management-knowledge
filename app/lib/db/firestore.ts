@@ -148,6 +148,23 @@ export class FirestoreSkillRepository implements ISkillRepository {
         return snap.docs.map((d) => fromSnap<Assessment>(d))
     }
 
+    async updateAssessmentSession(userId: string, evaluatedAt: string, items: AssessmentInput[]): Promise<void> {
+        const oldSnap = await this.col("assessments")
+            .where("userId", "==", userId)
+            .where("evaluatedAt", "==", evaluatedAt)
+            .get()
+        const batch = db().batch()
+        for (const doc of oldSnap.docs) batch.delete(doc.ref)
+        for (const item of items) {
+            const id = randomUUID()
+            batch.set(this.col("assessments").doc(id), {
+                id, userId, skillItemId: item.skillItemId,
+                currentLevel: item.currentLevel, evidence: item.evidence, evaluatedAt,
+            })
+        }
+        await batch.commit()
+    }
+
     async getAllLatestAssessments(): Promise<(Assessment & { userName: string; userRole: Role })[]> {
         const [allUsers, assessSnap] = await Promise.all([
             this.getAllUsers(),

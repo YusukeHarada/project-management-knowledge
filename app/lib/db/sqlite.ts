@@ -209,6 +209,18 @@ export class SqliteSkillRepository implements ISkillRepository {
     return rows.map(rowToAssessment)
   }
 
+  async updateAssessmentSession(userId: string, evaluatedAt: string, items: AssessmentInput[]): Promise<void> {
+    const deleteOld = this.db.prepare("DELETE FROM assessments WHERE user_id = ? AND evaluated_at = ?")
+    const insert = this.db.prepare("INSERT INTO assessments (id, user_id, skill_item_id, current_level, evidence, evaluated_at) VALUES (?, ?, ?, ?, ?, ?)")
+    const update = this.db.transaction(() => {
+      deleteOld.run(userId, evaluatedAt)
+      for (const item of items) {
+        insert.run(randomUUID(), userId, item.skillItemId, item.currentLevel, item.evidence, evaluatedAt)
+      }
+    })
+    update()
+  }
+
   async getAllLatestAssessments(): Promise<(Assessment & { userName: string; userRole: Role })[]> {
     const rows = this.db.prepare(`
       SELECT a.id, a.user_id, a.skill_item_id, a.current_level, a.evidence, a.evaluated_at,
