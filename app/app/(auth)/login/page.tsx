@@ -1,12 +1,20 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 
 export default function LoginPage() {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
+
+    // signInWithPopup はユーザー操作と同期している必要がある。
+    // await import() が挟まるとポップアップがブロックされるため、
+    // マウント時にモジュールをキャッシュしておく。
+    useEffect(() => {
+        import("@/lib/firebase/client")
+        import("firebase/auth")
+    }, [])
 
     async function handleGoogleSignIn() {
         setLoading(true)
