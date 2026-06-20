@@ -38,11 +38,22 @@ function SettingsContent() {
 
         fetch(`/api/users?uid=${uid}`)
             .then((r) => r.json())
-            .then((u: User | null) => {
-                if (!u || !u.id) { router.push("/"); return }
+            .then((u: User & { error?: string } | null) => {
+                if (!u) { router.push("/"); return }
+                // API エラー（RESOURCE_EXHAUSTED 等）の場合はリダイレクトせずエラー表示
+                if (u.error) {
+                    console.error("設定取得エラー:", u.error)
+                    setLoading(false)
+                    return
+                }
+                if (!u.id) { router.push("/"); return }
                 setUser(u)
                 setName(u.name)
                 setRole(u.role)
+                setLoading(false)
+            })
+            .catch((err) => {
+                console.error("設定取得失敗:", err)
                 setLoading(false)
             })
     }, [authLoading, firebaseUser?.uid, params, router])
