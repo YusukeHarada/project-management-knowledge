@@ -22,7 +22,7 @@ export interface ISkillRepository {
   upsertRoleTarget(skillItemId: string, role: Role, targetLevel: number): Promise<void>
 
   // ユーザー
-  createUser(name: string, role: Role): Promise<User>
+  createUser(name: string, role: Role, id?: string): Promise<User>
   getUserById(id: string): Promise<User | null>
   getAllUsers(): Promise<User[]>
 

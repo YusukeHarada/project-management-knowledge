@@ -81,11 +81,11 @@ export class FirestoreSkillRepository implements ISkillRepository {
         await this.col("role_targets").doc(id).set(data)
     }
 
-    async createUser(name: string, role: Role): Promise<User> {
-        const id = randomUUID()
+    async createUser(name: string, role: Role, id?: string): Promise<User> {
+        const userId = id ?? randomUUID()
         const now = new Date().toISOString()
-        await this.col("users").doc(id).set({ id, name, role, createdAt: FieldValue.serverTimestamp() })
-        return { id, name, role, createdAt: now }
+        await this.col("users").doc(userId).set({ id: userId, name, role, createdAt: now })
+        return { id: userId, name, role, createdAt: now }
     }
 
     async getUserById(id: string): Promise<User | null> {
@@ -101,6 +101,8 @@ export class FirestoreSkillRepository implements ISkillRepository {
 
     async saveAssessment(userId: string, items: AssessmentInput[]): Promise<void> {
         const batch = db().batch()
+        // ISO 文字列で保存（Timestamp だと文字列クエリと型不一致になるため）
+        const now = new Date().toISOString()
         for (const item of items) {
             const id = randomUUID()
             const ref = this.col("assessments").doc(id)
@@ -110,7 +112,7 @@ export class FirestoreSkillRepository implements ISkillRepository {
                 skillItemId: item.skillItemId,
                 currentLevel: item.currentLevel,
                 evidence: item.evidence,
-                evaluatedAt: FieldValue.serverTimestamp(),
+                evaluatedAt: now,
             })
         }
         await batch.commit()
