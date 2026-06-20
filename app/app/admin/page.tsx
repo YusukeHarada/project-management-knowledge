@@ -142,7 +142,13 @@ export default function AdminPage() {
   }
 
   async function rebuildSummaries() {
-    if (!confirm("全ユーザーのサマリーを再構築します。既存ユーザーのデータを Firestore に初めて登録する際に実行してください。")) return
+    if (!confirm(
+      "全ユーザーのサマリーを再構築します。\n\n" +
+      "【実行が必要なタイミング】\n" +
+      "・summaries 機能を初めて導入したとき（既存データの移行）\n" +
+      "・チームダッシュボードの表示がおかしいとき（整合性の修復）\n\n" +
+      "データは削除されません。続けますか？"
+    )) return
     const res = await fetch("/api/admin/rebuild-summaries", { method: "POST" })
     const data = await res.json()
     if (res.ok) {
@@ -162,9 +168,16 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">マスタ管理</h1>
-        <div className="flex gap-2">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">マスタ管理</h1>
+          {process.env.NEXT_PUBLIC_DB_BACKEND === "firestore" && (
+            <p className="text-xs text-gray-400 mt-1">
+              「サマリーを再構築する」は通常不要です。チームダッシュボードの表示がおかしいときや、summaries 機能の初回導入時のみ実行してください。
+            </p>
+          )}
+        </div>
+        <div className="flex gap-2 shrink-0">
           {process.env.NEXT_PUBLIC_DB_BACKEND === "firestore" && (
             <button
               onClick={rebuildSummaries}
