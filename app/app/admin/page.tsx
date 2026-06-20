@@ -113,6 +113,17 @@ export default function AdminPage() {
     }
   }
 
+  async function rebuildSummaries() {
+    if (!confirm("全ユーザーのサマリーを再構築します。既存ユーザーのデータを Firestore に初めて登録する際に実行してください。")) return
+    const res = await fetch("/api/admin/rebuild-summaries", { method: "POST" })
+    const data = await res.json()
+    if (res.ok) {
+      alert(`完了しました（${data.rebuilt} 人）`)
+    } else {
+      alert(`エラー: ${data.error}`)
+    }
+  }
+
   // 管理者チェック（Firestore モードのみ。認証解決後に判定）
   if (!authLoading && !isAdmin(user?.email)) {
     router.replace("/")
@@ -125,12 +136,22 @@ export default function AdminPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">マスタ管理</h1>
-        <button
-          onClick={exportSkillMap}
-          className="text-sm text-gray-600 border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50 transition-colors"
-        >
-          スキルマップ.md を更新する
-        </button>
+        <div className="flex gap-2">
+          {process.env.NEXT_PUBLIC_DB_BACKEND === "firestore" && (
+            <button
+              onClick={rebuildSummaries}
+              className="text-sm text-blue-600 border border-blue-300 rounded-lg px-4 py-2 hover:bg-blue-50 transition-colors"
+            >
+              サマリーを再構築する
+            </button>
+          )}
+          <button
+            onClick={exportSkillMap}
+            className="text-sm text-gray-600 border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50 transition-colors"
+          >
+            スキルマップ.md を更新する
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-2 border-b border-gray-200">

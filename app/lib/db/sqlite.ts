@@ -262,6 +262,10 @@ export class SqliteSkillRepository implements ISkillRepository {
       userRole: r.user_role as Role,
     }))
   }
+
+  async rebuildAllSummaries(): Promise<{ rebuilt: number }> {
+    return { rebuilt: 0 }  // SQLite はサマリー不要
+  }
 }
 
 function rowToSkillItem(r: Record<string, unknown>): SkillItem {
