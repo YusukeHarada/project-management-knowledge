@@ -29,9 +29,9 @@ export default function AdminPage() {
       fetch("/api/master").then((r) => r.json()),
       fetch("/api/users").then((r) => r.json()),
     ])
-    setCategories(master.categories)
-    setSkillItems(master.skillItems)
-    setRoleTargets(master.roleTargets)
+    setCategories(Array.isArray(master.categories) ? master.categories : [])
+    setSkillItems(Array.isArray(master.skillItems) ? master.skillItems : [])
+    setRoleTargets(Array.isArray(master.roleTargets) ? master.roleTargets : [])
     setUsers(Array.isArray(userList) ? userList : [])
     setLoading(false)
   }
