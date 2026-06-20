@@ -58,6 +58,7 @@ NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 NEXT_PUBLIC_FIREBASE_APP_ID=
 FIREBASE_SERVICE_ACCOUNT_KEY=   # JSON を文字列化したもの
+NEXT_PUBLIC_ADMIN_EMAILS=       # カンマ区切りで管理者メールアドレスを指定（未設定時は全員管理者）
 ```
 
 `DB_BACKEND` は API ルート（サーバーサイド）、`NEXT_PUBLIC_DB_BACKEND` はクライアントサイドの認証ガードに使用する。両方を同じ値に設定すること。
@@ -74,7 +75,8 @@ app/
 │   ├── dashboard/
 │   │   ├── [userId]/page.tsx         # 個人ダッシュボード（レーダーチャート・履歴比較）
 │   │   └── team/page.tsx             # チームダッシュボード（レーダーチャート・ヒートマップ）
-│   ├── admin/page.tsx                # マスタ管理（スキルマップ.md エクスポートボタン付き）
+│   ├── admin/page.tsx                # マスタ管理（スキルマップ.md エクスポート・ユーザー管理・サマリー再構築）
+│   ├── settings/page.tsx             # ユーザー設定（表示名・ロール変更・アカウント削除）
 │   ├── (auth)/login/page.tsx         # Google ログイン画面（Firestore モードのみ使用）
 │   └── api/
 │       ├── users/route.ts
@@ -82,7 +84,8 @@ app/
 │       ├── master/route.ts
 │       ├── master/categories/route.ts
 │       ├── master/items/route.ts
-│       └── admin/export-skillmap/route.ts  # スキルマップ.md 生成・書き出し
+│       ├── admin/export-skillmap/route.ts   # スキルマップ.md 生成・書き出し
+│       └── admin/rebuild-summaries/route.ts # Firestore summaries 再構築
 ├── contexts/
 │   └── AuthContext.tsx               # Firebase Auth 状態管理（Firestore モード用）
 ├── lib/
@@ -122,7 +125,11 @@ skill_items/{id}     : { categoryId, number, label, order }
 role_targets/{itemId}_{role} : { skillItemId, role, targetLevel }
 users/{uid}          : { name, role, createdAt }
 assessments/{id}     : { userId, skillItemId, currentLevel, evidence, evaluatedAt }
+summaries/{uid}      : { userId, userName, userRole, sessions[], latest: Record<skillItemId, {currentLevel, evidence, evaluatedAt}> }
 ```
+
+`summaries` は読み取り最適化用の非正規化コレクション。`assessments` への書き込み時に同時更新される。
+チームダッシュボードの全ユーザー最新評価取得を N×53 reads → N reads（N=ユーザー数）に削減する。
 
 ---
 
@@ -132,9 +139,10 @@ assessments/{id}     : { userId, skillItemId, currentLevel, evidence, evaluatedA
 |---|---|---|
 | `/` | トップ | 新規登録 / 続きから診断する（2タブ） |
 | `/assessment?userId=xxx` | スキル評価 | 53項目をLv0〜3で評価・前回値 pre-fill・カテゴリ遷移ボタン |
-| `/dashboard/[userId]` | 個人ダッシュボード | レーダーチャート・ギャップ一覧・育成アクション・履歴比較 |
+| `/dashboard/[userId]` | 個人ダッシュボード | レーダーチャート・ギャップ一覧・育成アクション・履歴比較・セッション編集/削除 |
 | `/dashboard/team` | チームダッシュボード | レーダーチャート・カテゴリ別平均・弱点サマリ・ヒートマップ |
-| `/admin` | マスタ管理 | カテゴリ・スキル項目・ロール別目標Lv・スキルマップ.md 出力 |
+| `/admin` | マスタ管理 | カテゴリ・スキル項目・ロール別目標Lv・スキルマップ.md 出力・ユーザー管理・サマリー再構築 |
+| `/settings` | ユーザー設定 | 表示名・ロール変更・アカウント削除（Firestore モード） |
 | `/login` | ログイン | Google サインイン（Firestore モード時のみ使用） |
 
 ---
@@ -156,9 +164,18 @@ Firebase Client SDK はブラウザ API に依存するため、`app/layout.tsx`
 ### PM ロールの追加
 `types/index.ts` の `Role` 型に `"pm"` を追加済み。既存 DB（SQLite）には `runMigrations()` で PM の role_targets を自動補完する（PL と同値がデフォルト、管理画面で調整可能）。
 
-### 履歴管理（SQLite モード）
-`assessments` テーブルは追記型（同一 skill_item_id に複数レコードが入る）。
-`getAssessmentSessions(userId)` で診断日一覧を取得し、個人ダッシュボードで前回比の比較列を表示する。
+### 履歴管理
+`assessments` は追記型（同一 skill_item_id に複数レコードが入る）。
+`getAssessmentSessions(userId)` で診断日一覧を取得し、個人ダッシュボードで複数セッションの比較・編集・削除ができる。
+
+### Firestore 読み取り最適化（summaries コレクション）
+`summaries/{uid}` に最新評価スナップショットを非正規化保持する。
+チームダッシュボードは summaries のみ読み（N reads）、`assessments` を直接読まない。
+評価保存時に `assessments` と `summaries` の両方を更新する。
+既存データの移行は `/admin` の「サマリーを再構築する」ボタンで実行する。
+
+### 管理者制御（Firestore モード）
+`NEXT_PUBLIC_ADMIN_EMAILS` 環境変数にカンマ区切りでメールアドレスを設定すると、そのユーザーのみ `/admin` にアクセスできる。未設定時はログイン済み全員が管理者扱い（初期セットアップ用）。
 
 ---
 
@@ -179,13 +196,16 @@ Firebase Client SDK はブラウザ API に依存するため、`app/layout.tsx`
 - [x] 名前・ロール入力（新規 / 続きから の 2 タブ）
 - [x] PMロール追加（4ロール: 開発者/PL/PM/推進者）
 - [x] スキル評価フォーム（10カテゴリ・53項目、Lv0〜3 + 根拠テキスト・前回値 pre-fill・次カテゴリボタン）
-- [x] 個人ダッシュボード（レーダーチャート・ギャップ一覧・育成アクション・履歴比較）
+- [x] 個人ダッシュボード（レーダーチャート・ギャップ一覧・育成アクション・履歴比較・セッション編集/削除）
 - [x] チームダッシュボード（レーダーチャート・カテゴリ別平均・弱点サマリ・ヒートマップ（番号順））
-- [x] マスタ管理画面（カテゴリ・スキル項目・ロール別目標Lv）
+- [x] マスタ管理画面（カテゴリ・スキル項目・ロール別目標Lv・ユーザー管理）
 - [x] スキルマップ.md エクスポート（管理画面から生成）
 - [x] SQLite 永続化 + Repository パターン
 - [x] Firestore 実装（DB_BACKEND=firestore で切り替え）
 - [x] Firebase Auth（Google、Firestore モード）
+- [x] Firestore 読み取り最適化（summaries コレクション、98% read 削減）
+- [x] 管理者制御（NEXT_PUBLIC_ADMIN_EMAILS）
+- [x] ユーザー設定画面（表示名・ロール変更・アカウント削除）
 - [x] ビジネスロジックのユニットテスト
 
 ### 未実装（将来対応）
