@@ -19,7 +19,12 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
-    const repo = await getRepository()
-    const users = await repo.getAllUsers()
-    return NextResponse.json(users)
+    try {
+        const repo = await getRepository()
+        const users = await repo.getAllUsers()
+        return NextResponse.json(users)
+    } catch (err) {
+        console.error("GET /api/users error:", err)
+        return NextResponse.json({ error: String(err) }, { status: 500 })
+    }
 }

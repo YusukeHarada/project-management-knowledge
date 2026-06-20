@@ -10,9 +10,14 @@ function initAdminApp() {
         throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY is not set")
     }
 
-    return initializeApp({
-        credential: cert(JSON.parse(serviceAccountKey)),
-    })
+    const parsed = JSON.parse(serviceAccountKey)
+
+    // Vercel の環境変数では private_key の \n がエスケープされたまま渡されることがある
+    if (parsed.private_key) {
+        parsed.private_key = parsed.private_key.replace(/\\n/g, "\n")
+    }
+
+    return initializeApp({ credential: cert(parsed) })
 }
 
 export function adminDb() {
