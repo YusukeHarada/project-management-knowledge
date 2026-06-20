@@ -5,7 +5,6 @@ import {
     indexedDBLocalPersistence,
     browserPopupRedirectResolver,
 } from "firebase/auth"
-import { getFirestore } from "firebase/firestore"
 
 const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
@@ -25,4 +24,5 @@ export const auth = initializeAuth(app, {
     popupRedirectResolver: browserPopupRedirectResolver,
 })
 
-export const db = getFirestore(app)
+// クライアント側 Firestore は使用しない（全 DB アクセスは API ルート経由の Admin SDK）
+// export const db を削除 → postMessage 無限ループを防止
