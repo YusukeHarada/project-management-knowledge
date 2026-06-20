@@ -2,6 +2,31 @@ import { NextRequest, NextResponse } from "next/server"
 import { getRepository } from "@/lib/db"
 import { z } from "zod"
 
+const updateUserSchema = z.object({
+    id: z.string(),
+    name: z.string().min(1).max(50).optional(),
+    role: z.enum(["developer", "pl", "pm", "promoter"]).optional(),
+})
+
+export async function PATCH(req: NextRequest) {
+    try {
+        const body = await req.json()
+        const parsed = updateUserSchema.safeParse(body)
+        if (!parsed.success) {
+            return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+        }
+        const repo = await getRepository()
+        const user = await repo.updateUser(parsed.data.id, {
+            name: parsed.data.name,
+            role: parsed.data.role,
+        })
+        return NextResponse.json(user)
+    } catch (err) {
+        console.error("PATCH /api/users error:", err)
+        return NextResponse.json({ error: String(err) }, { status: 500 })
+    }
+}
+
 const createUserSchema = z.object({
     name: z.string().min(1).max(50),
     role: z.enum(["developer", "pl", "pm", "promoter"]),

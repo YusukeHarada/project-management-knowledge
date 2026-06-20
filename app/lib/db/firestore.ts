@@ -99,6 +99,15 @@ export class FirestoreSkillRepository implements ISkillRepository {
         return snap.docs.map((d) => fromSnap<User>(d))
     }
 
+    async updateUser(userId: string, data: { name?: string; role?: Role }): Promise<User> {
+        const updates: Record<string, unknown> = {}
+        if (data.name !== undefined) updates.name = data.name
+        if (data.role !== undefined) updates.role = data.role
+        await this.col("users").doc(userId).update(updates)
+        const snap = await this.col("users").doc(userId).get()
+        return fromSnap<User>(snap as QueryDocumentSnapshot<DocumentData>)
+    }
+
     async deleteUser(userId: string): Promise<void> {
         const snap = await this.col("assessments").where("userId", "==", userId).get()
         const batch = db().batch()

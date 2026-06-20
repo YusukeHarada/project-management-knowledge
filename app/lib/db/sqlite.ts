@@ -164,6 +164,17 @@ export class SqliteSkillRepository implements ISkillRepository {
     return rows.map((r) => ({ id: r.id as string, name: r.name as string, role: r.role as Role, createdAt: r.created_at as string }))
   }
 
+  async updateUser(userId: string, data: { name?: string; role?: Role }): Promise<User> {
+    if (data.name !== undefined) {
+      this.db.prepare("UPDATE users SET name = ? WHERE id = ?").run(data.name, userId)
+    }
+    if (data.role !== undefined) {
+      this.db.prepare("UPDATE users SET role = ? WHERE id = ?").run(data.role, userId)
+    }
+    const row = this.db.prepare("SELECT id, name, role, created_at FROM users WHERE id = ?").get(userId) as Record<string, unknown>
+    return { id: row.id as string, name: row.name as string, role: row.role as Role, createdAt: row.created_at as string }
+  }
+
   async deleteUser(userId: string): Promise<void> {
     const del = this.db.transaction(() => {
       this.db.prepare("DELETE FROM assessments WHERE user_id = ?").run(userId)
