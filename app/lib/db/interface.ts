@@ -37,4 +37,7 @@ export interface ISkillRepository {
   updateAssessmentSession(userId: string, evaluatedAt: string, items: AssessmentInput[]): Promise<void>
   deleteAssessmentSession(userId: string, evaluatedAt: string): Promise<void>
   getAllLatestAssessments(): Promise<(Assessment & { userName: string; userRole: Role })[]>
+
+  // サマリー再構築（Firestoreモードのみ有効。SQLiteはno-op）
+  rebuildAllSummaries?(): Promise<{ rebuilt: number }>
 }
