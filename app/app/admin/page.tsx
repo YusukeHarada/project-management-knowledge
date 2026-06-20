@@ -24,6 +24,9 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<"categories" | "items" | "users">("categories")
   const [users, setUsers] = useState<User[]>([])
   const [editingUser, setEditingUser] = useState<{ id: string; name: string; role: Role } | null>(null)
+  const [testUserForm, setTestUserForm] = useState<{ name: string; role: Role; withData: boolean }>({ name: "", role: "developer", withData: true })
+  const [addingTestUser, setAddingTestUser] = useState(false)
+  const [addingTestUserLoading, setAddingTestUserLoading] = useState(false)
 
   async function load() {
     const [master, userList] = await Promise.all([
@@ -56,6 +59,33 @@ export default function AdminPage() {
     setEditingUser(null)
     await load()
     setSaving(false)
+  }
+
+  async function addTestUser() {
+    if (!testUserForm.name.trim()) return
+    setAddingTestUserLoading(true)
+    const userRes = await fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: testUserForm.name.trim(), role: testUserForm.role }),
+    })
+    const user = await userRes.json()
+    if (testUserForm.withData && user.id && skillItems.length > 0) {
+      const items = skillItems.map((item) => ({
+        skillItemId: item.id,
+        currentLevel: Math.floor(Math.random() * 4),
+        evidence: "",
+      }))
+      await fetch("/api/assessments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, items }),
+      })
+    }
+    setAddingTestUser(false)
+    setTestUserForm({ name: "", role: "developer", withData: true })
+    await load()
+    setAddingTestUserLoading(false)
   }
 
   function getTarget(skillItemId: string, role: Role): Level {
@@ -357,7 +387,66 @@ export default function AdminPage() {
         </div>
       )}
       {activeTab === "users" && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+        <div className="space-y-4">
+          {/* テストユーザー追加フォーム */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">テストユーザーを追加</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Google アカウントなしでテスト用ユーザーを作成します。ログインはできません。</p>
+              </div>
+              {!addingTestUser && (
+                <button onClick={() => setAddingTestUser(true)} className="text-sm text-blue-600 border border-blue-300 rounded-lg px-4 py-2 hover:bg-blue-50 transition-colors">
+                  追加する
+                </button>
+              )}
+            </div>
+            {addingTestUser && (
+              <div className="space-y-3 pt-2 border-t border-gray-100">
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">名前</label>
+                    <input
+                      type="text"
+                      value={testUserForm.name}
+                      onChange={(e) => setTestUserForm((p) => ({ ...p, name: e.target.value }))}
+                      placeholder="例: テスト太郎"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">ロール</label>
+                    <select
+                      value={testUserForm.role}
+                      onChange={(e) => setTestUserForm((p) => ({ ...p, role: e.target.value as Role }))}
+                      className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={testUserForm.withData}
+                    onChange={(e) => setTestUserForm((p) => ({ ...p, withData: e.target.checked }))}
+                    className="accent-blue-600"
+                  />
+                  <span className="text-sm text-gray-700">ランダムな評価データも追加する（チームダッシュボードの確認用）</span>
+                </label>
+                <div className="flex gap-2">
+                  <button onClick={addTestUser} disabled={addingTestUserLoading || !testUserForm.name.trim()} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                    {addingTestUserLoading ? "追加中..." : "追加"}
+                  </button>
+                  <button onClick={() => { setAddingTestUser(false); setTestUserForm({ name: "", role: "developer", withData: true }) }} className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50">
+                    キャンセル
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
           <div className="mb-4">
             <h2 className="text-base font-semibold text-gray-900">ユーザー一覧</h2>
             <p className="text-xs text-gray-500 mt-1">削除するとそのユーザーの診断データもすべて削除されます。</p>
@@ -417,6 +506,7 @@ export default function AdminPage() {
               </tbody>
             </table>
           )}
+          </div>
         </div>
       )}
     </div>
