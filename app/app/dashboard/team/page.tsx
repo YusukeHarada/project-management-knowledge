@@ -30,6 +30,7 @@ export default function TeamDashboard() {
     const [roleTargets, setRoleTargets] = useState<RoleTarget[]>([])
     const [assessments, setAssessments] = useState<FullAssessment[]>([])
     const [loading, setLoading] = useState(true)
+    const [fetchError, setFetchError] = useState<string>("")
     const [selectedCategory, setSelectedCategory] = useState<string>("all")
 
     useEffect(() => {
@@ -38,16 +39,30 @@ export default function TeamDashboard() {
             fetch("/api/master").then((r) => r.json()),
             fetch("/api/assessments").then((r) => r.json()),
         ]).then(([us, master, ass]) => {
-            setUsers(us)
-            setCategories(master.categories)
-            setSkillItems(master.skillItems)
-            setRoleTargets(master.roleTargets)
-            setAssessments(ass)
+            if (master.error || us.error || ass.error) {
+                setFetchError(master.error ?? us.error ?? ass.error ?? "API エラー")
+                setLoading(false)
+                return
+            }
+            setUsers(Array.isArray(us) ? us : [])
+            setCategories(Array.isArray(master.categories) ? master.categories : [])
+            setSkillItems(Array.isArray(master.skillItems) ? master.skillItems : [])
+            setRoleTargets(Array.isArray(master.roleTargets) ? master.roleTargets : [])
+            setAssessments(Array.isArray(ass) ? ass : [])
+            setLoading(false)
+        }).catch((err) => {
+            setFetchError(String(err))
             setLoading(false)
         })
     }, [])
 
     if (loading) return <div className="text-center py-20 text-gray-500">読み込み中...</div>
+    if (fetchError) return (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+            <p className="text-red-700 font-medium mb-1">サーバーエラー</p>
+            <pre className="text-xs text-red-600 whitespace-pre-wrap break-all">{fetchError}</pre>
+        </div>
+    )
 
     const assessedUserIds = [...new Set(assessments.map((a) => a.userId))]
     const assessedUsers = users.filter((u) => assessedUserIds.includes(u.id))
