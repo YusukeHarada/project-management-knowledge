@@ -42,3 +42,19 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: String(err) }, { status: 500 })
     }
 }
+
+export async function DELETE(req: NextRequest) {
+    try {
+        const { searchParams } = new URL(req.url)
+        const id = searchParams.get("id")
+        if (!id) {
+            return NextResponse.json({ error: "id が必要です" }, { status: 400 })
+        }
+        const repo = await getRepository()
+        await repo.deleteUser(id)
+        return NextResponse.json({ ok: true })
+    } catch (err) {
+        console.error("DELETE /api/users error:", err)
+        return NextResponse.json({ error: String(err) }, { status: 500 })
+    }
+}

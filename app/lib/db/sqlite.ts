@@ -164,6 +164,14 @@ export class SqliteSkillRepository implements ISkillRepository {
     return rows.map((r) => ({ id: r.id as string, name: r.name as string, role: r.role as Role, createdAt: r.created_at as string }))
   }
 
+  async deleteUser(userId: string): Promise<void> {
+    const del = this.db.transaction(() => {
+      this.db.prepare("DELETE FROM assessments WHERE user_id = ?").run(userId)
+      this.db.prepare("DELETE FROM users WHERE id = ?").run(userId)
+    })
+    del()
+  }
+
   async saveAssessment(userId: string, items: AssessmentInput[]): Promise<void> {
     const insert = this.db.prepare("INSERT INTO assessments (id, user_id, skill_item_id, current_level, evidence, evaluated_at) VALUES (?, ?, ?, ?, ?, ?)")
     const now = new Date().toISOString()
@@ -207,6 +215,10 @@ export class SqliteSkillRepository implements ISkillRepository {
       "SELECT id, user_id, skill_item_id, current_level, evidence, evaluated_at FROM assessments WHERE user_id = ? AND evaluated_at = ?"
     ).all(userId, evaluatedAt) as Record<string, unknown>[]
     return rows.map(rowToAssessment)
+  }
+
+  async deleteAssessmentSession(userId: string, evaluatedAt: string): Promise<void> {
+    this.db.prepare("DELETE FROM assessments WHERE user_id = ? AND evaluated_at = ?").run(userId, evaluatedAt)
   }
 
   async updateAssessmentSession(userId: string, evaluatedAt: string, items: AssessmentInput[]): Promise<void> {

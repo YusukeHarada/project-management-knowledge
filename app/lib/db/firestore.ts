@@ -99,6 +99,14 @@ export class FirestoreSkillRepository implements ISkillRepository {
         return snap.docs.map((d) => fromSnap<User>(d))
     }
 
+    async deleteUser(userId: string): Promise<void> {
+        const snap = await this.col("assessments").where("userId", "==", userId).get()
+        const batch = db().batch()
+        for (const doc of snap.docs) batch.delete(doc.ref)
+        batch.delete(this.col("users").doc(userId))
+        await batch.commit()
+    }
+
     async saveAssessment(userId: string, items: AssessmentInput[]): Promise<void> {
         const batch = db().batch()
         // ISO 文字列で保存（Timestamp だと文字列クエリと型不一致になるため）
@@ -146,6 +154,16 @@ export class FirestoreSkillRepository implements ISkillRepository {
             .where("evaluatedAt", "==", evaluatedAt)
             .get()
         return snap.docs.map((d) => fromSnap<Assessment>(d))
+    }
+
+    async deleteAssessmentSession(userId: string, evaluatedAt: string): Promise<void> {
+        const snap = await this.col("assessments")
+            .where("userId", "==", userId)
+            .where("evaluatedAt", "==", evaluatedAt)
+            .get()
+        const batch = db().batch()
+        for (const doc of snap.docs) batch.delete(doc.ref)
+        await batch.commit()
     }
 
     async updateAssessmentSession(userId: string, evaluatedAt: string, items: AssessmentInput[]): Promise<void> {

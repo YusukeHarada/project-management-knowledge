@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import type { Category, SkillItem, RoleTarget, Role, Level } from "@/types"
+import type { Category, SkillItem, RoleTarget, Role, Level, User } from "@/types"
 
 const ROLES: Role[] = ["developer", "pl", "pm", "promoter"]
 const ROLE_LABELS: Record<Role, string> = { developer: "開発者", pl: "PL", pm: "PM", promoter: "推進者" }
@@ -16,17 +16,28 @@ export default function AdminPage() {
   const [newCatName, setNewCatName] = useState("")
   const [editingItem, setEditingItem] = useState<Partial<SkillItem & { targets: Record<Role, Level> }> | null>(null)
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState<"categories" | "items">("categories")
+  const [activeTab, setActiveTab] = useState<"categories" | "items" | "users">("categories")
+  const [users, setUsers] = useState<User[]>([])
 
   async function load() {
-    const master = await fetch("/api/master").then((r) => r.json())
+    const [master, userList] = await Promise.all([
+      fetch("/api/master").then((r) => r.json()),
+      fetch("/api/users").then((r) => r.json()),
+    ])
     setCategories(master.categories)
     setSkillItems(master.skillItems)
     setRoleTargets(master.roleTargets)
+    setUsers(Array.isArray(userList) ? userList : [])
     setLoading(false)
   }
 
   useEffect(() => { load() }, [])
+
+  async function deleteUser(id: string, name: string) {
+    if (!confirm(`「${name}」を削除しますか？\n診断データもすべて削除されます。この操作は元に戻せません。`)) return
+    await fetch(`/api/users?id=${id}`, { method: "DELETE" })
+    await load()
+  }
 
   function getTarget(skillItemId: string, role: Role): Level {
     return (roleTargets.find((t) => t.skillItemId === skillItemId && t.role === role)?.targetLevel ?? 0) as Level
@@ -112,13 +123,13 @@ export default function AdminPage() {
       </div>
 
       <div className="flex gap-2 border-b border-gray-200">
-        {(["categories", "items"] as const).map((tab) => (
+        {([["categories", "カテゴリ管理"], ["items", "スキル項目管理"], ["users", "ユーザー管理（管理者）"]] as const).map(([tab, label]) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === tab ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}
           >
-            {tab === "categories" ? "カテゴリ管理" : "スキル項目管理"}
+            {label}
           </button>
         ))}
       </div>
@@ -267,6 +278,46 @@ export default function AdminPage() {
               </div>
             )
           })}
+        </div>
+      )}
+      {activeTab === "users" && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <div className="mb-4">
+            <h2 className="text-base font-semibold text-gray-900">ユーザー一覧</h2>
+            <p className="text-xs text-gray-500 mt-1">削除するとそのユーザーの診断データもすべて削除されます。</p>
+          </div>
+          {users.length === 0 ? (
+            <p className="text-sm text-gray-500">登録されているユーザーがいません。</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 text-gray-500 text-xs">
+                  <th className="text-left py-2 pr-4">名前</th>
+                  <th className="text-left py-2 pr-4">ロール</th>
+                  <th className="text-left py-2 pr-4">登録日</th>
+                  <th className="text-right py-2">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-2 pr-4 font-medium">{u.name}</td>
+                    <td className="py-2 pr-4 text-gray-600">{ROLE_LABELS[u.role]}</td>
+                    <td className="py-2 pr-4 text-gray-500 text-xs">{new Date(u.createdAt).toLocaleDateString("ja-JP")}</td>
+                    <td className="py-2 text-right">
+                      <a href={`/dashboard/${u.id}`} className="text-xs text-blue-600 hover:underline mr-3">ダッシュボード</a>
+                      <button
+                        onClick={() => deleteUser(u.id, u.name)}
+                        className="text-xs text-red-500 hover:text-red-700"
+                      >
+                        削除
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
     </div>
