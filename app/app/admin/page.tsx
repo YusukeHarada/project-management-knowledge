@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react"
 import type { Category, SkillItem, RoleTarget, Role, Level } from "@/types"
 
-const ROLES: Role[] = ["developer", "pl", "promoter"]
-const ROLE_LABELS: Record<Role, string> = { developer: "開発者", pl: "PL", promoter: "推進者" }
+const ROLES: Role[] = ["developer", "pl", "pm", "promoter"]
+const ROLE_LABELS: Record<Role, string> = { developer: "開発者", pl: "PL", pm: "PM", promoter: "推進者" }
 
 export default function AdminPage() {
   const [categories, setCategories] = useState<Category[]>([])
@@ -87,11 +87,29 @@ export default function AdminPage() {
     setEditingItem({ categoryId: categories[0]?.id ?? "", number: "", label: "", order: 99, targets })
   }
 
+  async function exportSkillMap() {
+    const res = await fetch("/api/admin/export-skillmap", { method: "POST" })
+    if (res.ok) {
+      alert("スキルマップ.md を更新しました。")
+    } else {
+      const data = await res.json()
+      alert(`エラー: ${data.error}`)
+    }
+  }
+
   if (loading) return <div className="text-center py-20 text-gray-500">読み込み中...</div>
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">マスタ管理</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">マスタ管理</h1>
+        <button
+          onClick={exportSkillMap}
+          className="text-sm text-gray-600 border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50 transition-colors"
+        >
+          スキルマップ.md を更新する
+        </button>
+      </div>
 
       <div className="flex gap-2 border-b border-gray-200">
         {(["categories", "items"] as const).map((tab) => (
