@@ -35,11 +35,17 @@ export async function GET(req: NextRequest) {
         const userId = searchParams.get("userId")
         const date = searchParams.get("date")
         const sessions = searchParams.get("sessions")
+        const all = searchParams.get("all")
         const repo = await getRepository()
 
         if (userId && sessions === "true") {
             const dates = await repo.getAssessmentSessions(userId)
             return NextResponse.json(dates)
+        }
+        // all=true: 全履歴を返す（推移グラフ用）
+        if (userId && all === "true") {
+            const assessments = await repo.getAssessmentByUser(userId)
+            return NextResponse.json(assessments)
         }
         if (userId && date) {
             const assessments = await repo.getAssessmentByUserAndDate(userId, date)

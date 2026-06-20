@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import {
     RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Legend, Tooltip,
+    LineChart, Line, XAxis, YAxis, CartesianGrid,
 } from "recharts"
 import { buildGapAnalysis, aggregateCategoryScores } from "@/lib/domain/scoring"
 import type { User, Assessment, Category, SkillItem, RoleTarget, GapAnalysis, CategoryScore, Role, Level } from "@/types"
@@ -11,14 +12,25 @@ import type { User, Assessment, Category, SkillItem, RoleTarget, GapAnalysis, Ca
 const ROLE_LABELS: Record<Role, string> = { developer: "開発者", pl: "PL", pm: "PM", promoter: "推進者" }
 const PRIORITY_LABELS = { high: { label: "★★★ 優先度高", color: "text-red-600 bg-red-50 border-red-200" }, medium: { label: "★★☆ 優先度中", color: "text-yellow-600 bg-yellow-50 border-yellow-200" }, low: { label: "★☆☆ 優先度低", color: "text-gray-500 bg-gray-50 border-gray-200" } }
 
+const CATEGORY_COLORS = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#f97316","#84cc16","#ec4899","#6b7280"]
+
+interface TrendPoint {
+    date: string
+    [cat: string]: number | string
+}
+
 export default function PersonalDashboard() {
     const { userId } = useParams<{ userId: string }>()
     const [user, setUser] = useState<User | null>(null)
+    const [categories, setCategories] = useState<Category[]>([])
+    const [skillItems, setSkillItems] = useState<SkillItem[]>([])
+    const [roleTargets, setRoleTargets] = useState<RoleTarget[]>([])
     const [gapAnalyses, setGapAnalyses] = useState<GapAnalysis[]>([])
     const [categoryScores, setCategoryScores] = useState<CategoryScore[]>([])
     const [sessions, setSessions] = useState<string[]>([])
     const [compareDate, setCompareDate] = useState<string>("")
     const [prevLevels, setPrevLevels] = useState<Record<string, Level>>({})
+    const [trendData, setTrendData] = useState<TrendPoint[]>([])
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
@@ -31,6 +43,9 @@ export default function PersonalDashboard() {
             const found = users.find((u) => u.id === userId)
             if (!found) return
             setUser(found)
+            setCategories(master.categories)
+            setSkillItems(master.skillItems)
+            setRoleTargets(master.roleTargets)
             const gaps = buildGapAnalysis(assessments, master.skillItems, master.categories, master.roleTargets, found.role)
             setGapAnalyses(gaps)
             setCategoryScores(aggregateCategoryScores(gaps, master.categories))
@@ -39,6 +54,7 @@ export default function PersonalDashboard() {
         })
     }, [userId])
 
+    // 前回比較データ取得
     useEffect(() => {
         if (!compareDate) { setPrevLevels({}); return }
         fetch(`/api/assessments?userId=${userId}&date=${encodeURIComponent(compareDate)}`)
@@ -50,6 +66,30 @@ export default function PersonalDashboard() {
             })
     }, [compareDate, userId])
 
+    // 推移グラフ: 全履歴から各セッションのカテゴリ平均を計算
+    useEffect(() => {
+        if (sessions.length < 2 || !user || skillItems.length === 0) return
+        fetch(`/api/assessments?userId=${userId}&all=true`)
+            .then((r) => r.json())
+            .then((allAssessments: Assessment[]) => {
+                const points: TrendPoint[] = sessions.slice().reverse().map((sessionDate) => {
+                    const sessionAssessments = allAssessments.filter((a) => a.evaluatedAt === sessionDate)
+                    const scores = aggregateCategoryScores(
+                        buildGapAnalysis(sessionAssessments, skillItems, categories, roleTargets, user.role),
+                        categories
+                    )
+                    const point: TrendPoint = {
+                        date: new Date(sessionDate).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" }),
+                    }
+                    for (const s of scores) {
+                        point[s.categoryName.replace(/（.*）/, "").substring(0, 8)] = Math.round(s.averageCurrent * 10) / 10
+                    }
+                    return point
+                })
+                setTrendData(points)
+            })
+    }, [sessions, user, skillItems, categories, roleTargets, userId])
+
     if (loading) return <div className="text-center py-20 text-gray-500">読み込み中...</div>
     if (!user) return <div className="text-center py-20 text-gray-500">ユーザーが見つかりません</div>
 
@@ -59,6 +99,9 @@ export default function PersonalDashboard() {
         現状: Math.round(c.averageCurrent * 10) / 10,
         目標: Math.round(c.averageTarget * 10) / 10,
     }))
+
+    // 推移グラフ用のカテゴリキー一覧
+    const trendCategories = categories.map((c) => c.name.replace(/（.*）/, "").substring(0, 8))
 
     function formatDate(iso: string) {
         return new Date(iso).toLocaleString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
@@ -102,6 +145,33 @@ export default function PersonalDashboard() {
                     </RadarChart>
                 </ResponsiveContainer>
             </div>
+
+            {/* 成長トレンドグラフ（2回以上診断時） */}
+            {trendData.length >= 2 && (
+                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                    <h2 className="text-lg font-semibold mb-4">成長トレンド（カテゴリ別推移）</h2>
+                    <ResponsiveContainer width="100%" height={280}>
+                        <LineChart data={trendData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                            <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                            <YAxis domain={[0, 3]} ticks={[0, 1, 2, 3]} tick={{ fontSize: 11 }} tickFormatter={(v) => `Lv${v}`} />
+                            <Tooltip formatter={(v) => `Lv${v}`} />
+                            <Legend wrapperStyle={{ fontSize: 10 }} />
+                            {trendCategories.map((cat, i) => (
+                                <Line
+                                    key={cat}
+                                    type="monotone"
+                                    dataKey={cat}
+                                    stroke={CATEGORY_COLORS[i % CATEGORY_COLORS.length]}
+                                    strokeWidth={2}
+                                    dot={{ r: 3 }}
+                                    activeDot={{ r: 5 }}
+                                />
+                            ))}
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
+            )}
 
             {/* 優先育成アクション */}
             {highPriority.length > 0 && (

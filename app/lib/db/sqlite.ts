@@ -146,11 +146,11 @@ export class SqliteSkillRepository implements ISkillRepository {
       .run(skillItemId, role, targetLevel)
   }
 
-  async createUser(name: string, role: Role): Promise<User> {
-    const id = randomUUID()
+  async createUser(name: string, role: Role, id?: string): Promise<User> {
+    const userId = id ?? randomUUID()
     const createdAt = new Date().toISOString()
-    this.db.prepare("INSERT INTO users (id, name, role, created_at) VALUES (?, ?, ?, ?)").run(id, name, role, createdAt)
-    return { id, name, role, createdAt }
+    this.db.prepare("INSERT INTO users (id, name, role, created_at) VALUES (?, ?, ?, ?)").run(userId, name, role, createdAt)
+    return { id: userId, name, role, createdAt }
   }
 
   async getUserById(id: string): Promise<User | null> {
