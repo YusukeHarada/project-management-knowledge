@@ -58,7 +58,7 @@ function buildMarkdown(categories: Category[], skillItems: SkillItem[], roleTarg
 
 export async function POST() {
     try {
-        const repo = getRepository()
+        const repo = await getRepository()
         const [categories, skillItems, roleTargets] = await Promise.all([
             repo.getCategories(),
             repo.getSkillItems(),
