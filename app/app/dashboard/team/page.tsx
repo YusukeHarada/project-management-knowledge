@@ -32,6 +32,7 @@ export default function TeamDashboard() {
     const [loading, setLoading] = useState(true)
     const [fetchError, setFetchError] = useState<string>("")
     const [selectedCategory, setSelectedCategory] = useState<string>("all")
+    const [selectedRole, setSelectedRole] = useState<Role | "all">("all")
 
     useEffect(() => {
         Promise.all([
@@ -67,6 +68,10 @@ export default function TeamDashboard() {
     const assessedUserIds = [...new Set(assessments.map((a) => a.userId))]
     const assessedUsers = users.filter((u) => assessedUserIds.includes(u.id))
 
+    const roleFilteredUsers = selectedRole === "all"
+        ? assessedUsers
+        : assessedUsers.filter((u) => u.role === selectedRole)
+
     const filteredItems = selectedCategory === "all"
         ? skillItems
         : skillItems.filter((i) => i.categoryId === selectedCategory)
@@ -75,44 +80,65 @@ export default function TeamDashboard() {
         return assessments.find((a) => a.userId === userId && a.skillItemId === skillItemId)?.currentLevel ?? -1
     }
 
-    // カテゴリ別平均
+    // カテゴリ別平均（ロールフィルター適用）
     const categoryAverages = categories.map((cat) => {
         const items = skillItems.filter((i) => i.categoryId === cat.id)
-        const allLevels = assessedUsers.flatMap((u) =>
+        const allLevels = roleFilteredUsers.flatMap((u) =>
             items.map((i) => getLevel(u.id, i.id)).filter((lv) => lv >= 0)
         )
         const avg = allLevels.length > 0 ? allLevels.reduce((s, v) => s + v, 0) / allLevels.length : null
 
-        // チーム平均目標（各ユーザーのロール別目標レベルの平均）
-        const targetLevels: number[] = assessedUsers.flatMap((u) =>
-            items.map((i) => (roleTargets.find((t) => t.skillItemId === i.id && t.role === u.role)?.targetLevel ?? 0) as number)
-        )
+        // 目標: ロール指定時はそのロールの固定目標値、全体時は各ユーザーのロール別目標の平均
+        const targetLevels: number[] = selectedRole === "all"
+            ? roleFilteredUsers.flatMap((u) =>
+                items.map((i) => (roleTargets.find((t) => t.skillItemId === i.id && t.role === u.role)?.targetLevel ?? 0) as number)
+            )
+            : items.map((i) => (roleTargets.find((t) => t.skillItemId === i.id && t.role === selectedRole)?.targetLevel ?? 0) as number)
         const avgTarget = targetLevels.length > 0 ? targetLevels.reduce((s, v) => s + v, 0) / targetLevels.length : 0
 
         return { ...cat, avg, avgTarget }
     })
 
     // レーダーチャートデータ
+    const radarLabel = selectedRole === "all" ? "チーム平均" : `${ROLE_LABELS[selectedRole]}平均`
     const radarData = categoryAverages
         .filter((c) => c.avg !== null)
         .map((c) => ({
             subject: c.name.replace(/（.*）/, "").substring(0, 10),
-            チーム平均: Math.round((c.avg ?? 0) * 10) / 10,
-            目標平均: Math.round(c.avgTarget * 10) / 10,
+            [radarLabel]: Math.round((c.avg ?? 0) * 10) / 10,
+            目標: Math.round(c.avgTarget * 10) / 10,
         }))
 
-    // 弱点項目（チーム平均が1未満）
+    // 弱点項目（ロールフィルター適用、平均Lv1未満）
     const weakItems = skillItems.map((item) => {
-        const levels = assessedUsers.map((u) => getLevel(u.id, item.id)).filter((lv) => lv >= 0)
+        const levels = roleFilteredUsers.map((u) => getLevel(u.id, item.id)).filter((lv) => lv >= 0)
         const avg = levels.length > 0 ? levels.reduce((s, v) => s + v, 0) / levels.length : null
         return { ...item, avg }
     }).filter((i) => i.avg !== null && i.avg < 1).sort((a, b) => (a.avg ?? 0) - (b.avg ?? 0))
 
     return (
         <div className="space-y-8">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold">チームダッシュボード</h1>
-                <p className="text-sm text-gray-500">評価済みメンバー: {assessedUsers.length}名</p>
+            <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                    <h1 className="text-2xl font-bold">チームダッシュボード</h1>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                        評価済みメンバー: {assessedUsers.length}名
+                        {selectedRole !== "all" && ` （${ROLE_LABELS[selectedRole]}: ${roleFilteredUsers.length}名）`}
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500">ロール絞り込み:</span>
+                    <select
+                        value={selectedRole}
+                        onChange={(e) => setSelectedRole(e.target.value as Role | "all")}
+                        className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                        <option value="all">全ロール</option>
+                        {(Object.entries(ROLE_LABELS) as [Role, string][]).map(([role, label]) => (
+                            <option key={role} value={role}>{label}</option>
+                        ))}
+                    </select>
+                </div>
             </div>
 
             {assessedUsers.length === 0 && (
@@ -120,17 +146,25 @@ export default function TeamDashboard() {
                     <p className="text-yellow-700">まだ診断結果がありません。<a href="/" className="underline">トップページ</a>から診断を開始してください。</p>
                 </div>
             )}
+            {assessedUsers.length > 0 && roleFilteredUsers.length === 0 && (
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 text-center">
+                    <p className="text-gray-500">{ROLE_LABELS[selectedRole as Role]} のメンバーはまだ診断結果がありません。</p>
+                </div>
+            )}
 
             {/* チームレーダーチャート */}
             {radarData.length > 0 && (
                 <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                    <h2 className="text-lg font-semibold mb-4">カテゴリ別チームスキルレーダー</h2>
+                    <h2 className="text-lg font-semibold mb-4">
+                        カテゴリ別スキルレーダー
+                        {selectedRole !== "all" && <span className="ml-2 text-sm font-normal text-blue-600">({ROLE_LABELS[selectedRole]})</span>}
+                    </h2>
                     <ResponsiveContainer width="100%" height={380}>
                         <RadarChart data={radarData}>
                             <PolarGrid />
                             <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11 }} />
-                            <Radar name="チーム平均" dataKey="チーム平均" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} />
-                            <Radar name="目標平均" dataKey="目標平均" stroke="#10b981" fill="#10b981" fillOpacity={0.1} strokeDasharray="4 2" />
+                            <Radar name={radarLabel} dataKey={radarLabel} stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} />
+                            <Radar name="目標" dataKey="目標" stroke="#10b981" fill="#10b981" fillOpacity={0.1} strokeDasharray="4 2" />
                             <Legend />
                             <Tooltip formatter={(v) => `Lv${v}`} />
                         </RadarChart>
@@ -139,7 +173,7 @@ export default function TeamDashboard() {
             )}
 
             {/* カテゴリ別平均スコア */}
-            {assessedUsers.length > 0 && (
+            {roleFilteredUsers.length > 0 && (
                 <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
                     <h2 className="text-lg font-semibold mb-4">カテゴリ別チーム平均</h2>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -172,7 +206,7 @@ export default function TeamDashboard() {
             )}
 
             {/* ヒートマップ */}
-            {assessedUsers.length > 0 && (
+            {roleFilteredUsers.length > 0 && (
                 <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm overflow-hidden">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-semibold">スキルヒートマップ</h2>
@@ -194,7 +228,7 @@ export default function TeamDashboard() {
                                 <tr>
                                     <th className="text-left pr-3 py-1 font-medium text-gray-500 w-8">番号</th>
                                     <th className="text-left pr-4 py-1 font-medium text-gray-500 max-w-xs">評価項目</th>
-                                    {assessedUsers.map((u) => (
+                                    {roleFilteredUsers.map((u) => (
                                         <th key={u.id} className="text-center py-1 px-1 font-medium text-gray-700 min-w-[3rem]">
                                             <a href={`/dashboard/${u.id}`} className="hover:underline text-blue-600">
                                                 <div>{u.name.substring(0, 4)}</div>
@@ -209,7 +243,7 @@ export default function TeamDashboard() {
                                     <tr key={item.id} className="border-t border-gray-50">
                                         <td className="pr-3 py-1 font-mono text-gray-400">{item.number}</td>
                                         <td className="pr-4 py-1 text-gray-700 max-w-xs truncate" title={item.label}>{item.label}</td>
-                                        {assessedUsers.map((u) => {
+                                        {roleFilteredUsers.map((u) => {
                                             const lv = getLevel(u.id, item.id)
                                             return (
                                                 <td key={u.id} className="text-center py-1 px-1">
