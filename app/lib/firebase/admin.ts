@@ -1,6 +1,5 @@
 import { getApps, initializeApp, getApp, cert } from "firebase-admin/app"
 import { getFirestore } from "firebase-admin/firestore"
-import { getAuth } from "firebase-admin/auth"
 
 function initAdminApp() {
     if (getApps().length > 0) return getApp()
@@ -23,9 +22,4 @@ function initAdminApp() {
 export function adminDb() {
     initAdminApp()
     return getFirestore()
-}
-
-export function adminAuth() {
-    initAdminApp()
-    return getAuth()
 }
